@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>24/7 Smart Music Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            text-align: center;
+            padding: 50px;
+        }
+        .player-container {
+            background: #1e1e1e;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            max-width: 450px;
+            margin: 0 auto;
+        }
+        h2 { margin-bottom: 5px; color: #1db954; }
+        #track-info { margin-bottom: 20px; font-size: 14px; color: #b3b3b3; min-height: 20px; }
+        
+        .search-box {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            padding: 10px;
+            border-radius: 25px;
+            border: none;
+            outline: none;
+            width: 60%;
+            font-size: 14px;
+            text-align: center;
+        }
+        button {
+            background-color: #1db954;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: bold;
+        }
+        button:hover { background-color: #1ed760; }
+        button:disabled { background-color: #555; cursor: not-allowed; }
+        
+        #next-btn { margin-top: 10px; display: none; }
+        audio { width: 100%; margin-top: 20px; outline: none; display: none; }
+        footer { margin-top: 40px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+
+    <div class="player-container">
+        <h2>🎵 Smart Stream Player</h2>
+        
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search a song or artist...">
+            <button id="search-btn" onclick="startSearch()">Search & Play</button>
+        </div>
+
+        <p id="track-info">Waiting for your search...</p>
+        
+        <audio id="audio-player" controls></audio>
+        <button id="next-btn" onclick="playNextTrack()">⏭ Skip to Next Similar Song</button>
+    </div>
+
+    <footer>Developed by Supun Dilshan</footer>
+
+    <script>
+        const audioPlayer = document.getElementById('audio-player');
+        const trackInfo = document.getElementById('track-info');
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        let upcomingTracks = []; // ඊළඟට ප්ලේ වෙන්න තියෙන සමාන සින්දු ලිස්ට් එක
+
+        // 1. Search කරලා පළවෙනි සින්දුව හොයාගැනීම
+        async function startSearch() {
+            const query = searchInput.value.trim();
+            if (!query) return alert("Please enter a song name!");
+
+            trackInfo.innerText = "Searching...";
+            searchBtn.disabled = true;
+
+            try {
+                const searchResponse = await fetch(`https://pipedapi.kavin.rocks/search?q=${encodeURIComponent(query)}&filter=music_songs`);
+                const searchData = await searchResponse.json();
+                
+                if (!searchData.items || searchData.items.length === 0) throw new Error("No results found.");
+
+                const firstResult = searchData.items[0];
+                const videoId = firstResult.url.split('/watch?v=')[1];
+                
+                // සින්දුව ප්ලේ කරන්න යැවීම
+                await playVideo(videoId, firstResult.title);
+
+            } catch (error) {
+                trackInfo.innerText = "Error finding song. Try another search.";
+                console.error(error);
+            }
+            searchBtn.disabled = false;
+        }
+
+        // 2. Video ID එකෙන් සින්දුව Play කිරීම සහ Related සින්දු හොයාගැනීම
+        async function playVideo(videoId, title) {
+            trackInfo.innerText = "Loading Audio: " + title;
+            nextBtn.disabled = true;
+
+            try {
+                const streamResponse = await fetch(`https://pipedapi.kavin.rocks/streams/${videoId}`);
+                const streamData = await streamResponse.json();
+
+                // හොඳම Audio Quality එක තේරීම
+                const audioStreams = streamData.audioStreams;
+                const bestAudio = audioStreams.find(stream => stream.mimeType.includes('audio/mp4')) || audioStreams[0];
+
+                // ඊළඟට Play වෙන්න Related Videos ලිස්ට් එකට දාගැනීම
+                if (streamData.relatedStreams) {
+                    upcomingTracks = streamData.relatedStreams
+                        .filter(stream => stream.type === 'stream' && !stream.isShort) // Shorts අයින් කිරීම
+                        .map(stream => ({
+                            id: stream.url.split('/watch?v=')[1],
+                            title: stream.title
+                        }));
+                }
+
+                // Audio එක Play කිරීම
+                trackInfo.innerText = "Playing: " + title;
+                audioPlayer.src = bestAudio.url;
+                audioPlayer.style.display = "block";
+                nextBtn.style.display = "inline-block";
+                
+                await audioPlayer.play();
+                nextBtn.disabled = false;
+
+            } catch (error) {
+                console.error("Playback error:", error);
+                trackInfo.innerText = "Error loading audio. Skipping to next...";
+                setTimeout(playNextTrack, 3000); // අවුලක් ගියොත් ඊළඟ සින්දුවට පනිනවා
+            }
+        }
+
+        // 3. ඊළඟ Related සින්දුවට යාම
+        function playNextTrack() {
+            if (upcomingTracks.length > 0) {
+                // List එකෙන් උඩින්ම තියෙන Related සින්දුව ගන්නවා
+                const nextTrack = upcomingTracks.shift(); 
+                playVideo(nextTrack.id, nextTrack.title);
+            } else {
+                trackInfo.innerText = "End of similar tracks. Please search again.";
+                audioPlayer.style.display = "none";
+                nextBtn.style.display = "none";
+            }
+        }
+
+        // සින්දුවක් ඉවර වුණාම සහ Error එකක් ආවොත් ඉබේම ඊළඟ එක ප්ලේ වෙන්න
+        audioPlayer.addEventListener('ended', playNextTrack);
+        audioPlayer.addEventListener('error', playNextTrack);
+
+        // Enter ඔබලා Search කරන්න පුළුවන් වෙන්න
+        searchInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                startSearch();
+            }
+        });
+    </script>
+
+</body>
+</html>
