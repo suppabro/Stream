@@ -175,7 +175,6 @@
     <div id="yt-player-container">
         <div id="youtube-player"></div>
     </div>
-
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
         const playBtn = document.getElementById('play-btn');
@@ -186,14 +185,19 @@
         let isPlaying = false;
         let isPlayerReady = false;
 
-        // මෙතන තමයි ඔයාගේ Playlist එක තියෙන්නේ. 
-        // පළවෙනියට 'Api Aya Hamuwela' සින්දුවේ Video ID එක දාලා තියෙනවා.
-        // ඔයාට ඕන තරම් සින්දු වල ID මේකට කමාවකින් වෙන් කරලා දාන්න පුළුවන්.
-        const radioPlaylist = [
-            'O_0Zc3gT-2Y', // Api Aya Hamuwela (මේක උදාහරණයක්, නියම ID එක මාරු කරන්න පුළුවන්)
-            'e2kSxz4mF9A', // තවත් සින්දුවක ID එකක්
-            'wK4mPweU1r0'  // තවත් සින්දුවක ID එකක්
+        // දැන් ID හොයන්න ඕන නෑ, කෙලින්ම සම්පූර්ණ ලින්ක් එක දාන්න!
+        const songLinks = [
+            "https://music.youtube.com/watch?v=FuZox51gFdU", // ඔයාගේ පළවෙනි සින්දුව
+            // තව සින්දු වල ලින්ක් මේ විදියට පල්ලෙහායින් කමාවක් දාලා එකතු කරන්න
+            // "https://www.youtube.com/watch?v=...",
         ];
+
+        // ලින්ක් එකෙන් ID එක ඉබේම ගලවන මැජික් එක
+        const radioPlaylist = songLinks.map(link => {
+            if(link.includes('v=')) return link.split('v=')[1].split('&')[0];
+            if(link.includes('youtu.be/')) return link.split('youtu.be/')[1].split('?')[0];
+            return link; // නිකන්ම ID එක දැම්මත් වැඩ කරනවා
+        });
 
         function onYouTubeIframeAPIReady() {
             ytPlayer = new YT.Player('youtube-player', {
@@ -214,33 +218,28 @@
             isPlayerReady = true;
             ytPlayer.setVolume(volumeSlider.value);
             
-            // Playlist එක Load කරනවා, හැබැයි Play කරන්නේ Button එක එබුවමයි
-            ytPlayer.loadPlaylist(radioPlaylist);
-            ytPlayer.setLoop(true); // ප්ලේ ලිස්ට් එක ඉවර වුණාම ආයෙ මුල ඉඳන් ප්ලේ වෙන්න
-            
-            setTimeout(() => {
-                ytPlayer.pauseVideo(); 
-            }, 500);
+            ytPlayer.cuePlaylist(radioPlaylist);
+            ytPlayer.setLoop(true);
         }
 
         function onPlayerStateChange(event) {
             if (event.data === YT.PlayerState.PLAYING) {
                 isPlaying = true;
                 playBtn.innerText = '⏸';
-                // ඇනිමේෂන් එක ප්ලේ කරන්න
                 visualizerBars.forEach(bar => bar.style.animationPlayState = 'running');
             } 
             else if (event.data === YT.PlayerState.PAUSED || event.data === YT.PlayerState.ENDED) {
                 isPlaying = false;
                 playBtn.innerText = '▶';
-                // ඇනිමේෂන් එක නතර කරන්න
                 visualizerBars.forEach(bar => bar.style.animationPlayState = 'paused');
             }
         }
 
         function togglePlay() {
-            if (!isPlayerReady) return;
-            
+            if (!isPlayerReady) {
+                alert("Player is loading... Please wait a second.");
+                return;
+            }
             if (isPlaying) {
                 ytPlayer.pauseVideo();
             } else {
@@ -254,5 +253,6 @@
             }
         }
     </script>
-</body>
+
+    </body>
 </html>
